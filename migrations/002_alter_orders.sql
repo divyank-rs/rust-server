@@ -1,0 +1,1 @@
+alter table if exists orders alter column pizza_id set not null;
