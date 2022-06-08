@@ -16,7 +16,7 @@ impl ResponseError for ServiceError {
             ServiceError::InternalServorError => {
                 HttpResponse::InternalServerError().json("Internal Server Error")
             }
-            ServiceError::BadRequest((x)) => HttpResponse::BadRequest().json(x),
+            ServiceError::BadRequest(x) => HttpResponse::BadRequest().json(x),
         }
     }
 }

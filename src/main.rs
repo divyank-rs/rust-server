@@ -2,14 +2,8 @@ mod errors;
 mod handlers;
 mod models;
 
-use actix_web::{
-    get, post,
-    web::{self, Json},
-    App, HttpServer, Responder,
-};
-use chrono::NaiveDateTime;
+use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
-use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::env;
 

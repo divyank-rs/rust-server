@@ -13,5 +13,6 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     migrate(&database_url, &MIGRATIONS)
         .await
         .expect("DATABASE CONNECTION FAILED");
+    println!("Finished migrating");
     Ok(())
 }
