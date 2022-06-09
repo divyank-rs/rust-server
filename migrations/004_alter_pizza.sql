@@ -1,0 +1,1 @@
+alter table if exists pizza alter column price_inr set not null

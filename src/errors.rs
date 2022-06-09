@@ -8,6 +8,9 @@ pub enum ServiceError {
 
     #[display(fmt = "Bad Request: {}", _0)]
     BadRequest(String),
+
+    #[display(fmt = "No Content")]
+    NoContent,
 }
 
 impl ResponseError for ServiceError {
@@ -17,6 +20,7 @@ impl ResponseError for ServiceError {
                 HttpResponse::InternalServerError().json("Internal Server Error")
             }
             ServiceError::BadRequest(x) => HttpResponse::BadRequest().json(x),
+            ServiceError::NoContent => HttpResponse::NoContent().json("No content"),
         }
     }
 }

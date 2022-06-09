@@ -1,6 +1,9 @@
-use super::DbState;
-use crate::errors::ServiceError;
-use crate::models::{Order, Pizza};
+use crate::{
+    errors::ServiceError,
+    helpers,
+    models::{Order, Pizza},
+    DbState,
+};
 use actix_web::{
     get, post,
     web::{self, Json},
@@ -49,12 +52,43 @@ async fn get_order(
 ) -> Result<impl Responder, ServiceError> {
     let pool = db_conn.db_pool.clone();
     let id = path.into_inner();
-    let order = match sqlx::query_as!(Order, "
+    let order = match sqlx::query!("
     Select id, pizza_id, mobile_no, remarks, price_inr, created_at, updated_at, deleted_at from orders where id = $1
+    and deleted_at is null
     ",id)
-    .fetch_one(&pool).await {
-        Ok(x) => {x},
-        Err(_) => {return Err(ServiceError::InternalServorError); }
+    .fetch_one(&pool)
+    .await
+    {
+        Ok(x) => x,
+        Err(y) => {
+            match y {
+                sqlx::Error::RowNotFound => {
+                    return Err(ServiceError::NoContent)
+                },
+                _ => {return Err(ServiceError::InternalServorError)}
+            }
+        }
+    };
+    let mut order = Order::new(
+        order.id,
+        order.pizza_id,
+        &order.mobile_no,
+        &order.remarks,
+        order.price_inr,
+        order.created_at,
+        order.updated_at,
+        &order.deleted_at,
+    );
+    order.pizza = match sqlx::query_as!(Pizza,
+        "
+        SELECT id, name, description, price_inr,created_at,updated_at,deleted_at from pizza where id = $1",
+        order.pizza_id
+    ).fetch_one(&pool)
+    .await {
+        Ok(x) => {Some(x)},
+        Err(y) => {
+            return Err(ServiceError::InternalServorError);
+        }
     };
     Ok(Json(order))
 }
@@ -84,10 +118,9 @@ async fn put_order(
     order_req: web::Json<OrderRequest>,
 ) -> Result<impl Responder, ServiceError> {
     let pool = db_conn.db_pool.clone();
-    let order = match sqlx::query_as!(
-        Order,
-        "INSERT INTO orders (pizza_id, mobile_no, remarks, price_inr, created_at, updated_at) 
-        VALUES ($1,$2,$3,$4,now(),now()) returning id, pizza_id, mobile_no, remarks, price_inr, 
+    let order = match sqlx::query!(
+        "INSERT INTO orders (pizza_id, mobile_no, remarks, price_inr, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,now(),now()) returning id, pizza_id, mobile_no, remarks, price_inr,
         created_at, updated_at, deleted_at",
         order_req.pizza_id,
         order_req.mobile_no,
@@ -102,5 +135,50 @@ async fn put_order(
             return Err(ServiceError::InternalServorError);
         }
     };
+    let order = Order::new(
+        order.id,
+        order.pizza_id,
+        &order.mobile_no,
+        &order.remarks,
+        order.price_inr,
+        order.created_at,
+        order.updated_at,
+        &order.deleted_at,
+    );
     Ok(Json(order))
+}
+
+#[get("/price/{id}")]
+async fn get_price(
+    db_conn: web::Data<DbState>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, ServiceError> {
+    let pool = db_conn.db_pool.clone();
+    let id = path.into_inner();
+    let count = match sqlx::query!(
+        "Select count(*) as count from orders 
+    where created_at > (NOW() - INTERVAL '1 DAY')"
+    )
+    .fetch_one(&pool)
+    .await
+    {
+        Err(_) => {
+            return Err(ServiceError::InternalServorError);
+        }
+        Ok(x) => x,
+    };
+    if count.count == None {
+        return Err(ServiceError::InternalServorError);
+    }
+    let price = match sqlx::query!("Select price_inr from pizza where id = $1", id)
+        .fetch_one(&pool)
+        .await
+    {
+        Err(_) => {
+            return Err(ServiceError::InternalServorError);
+        }
+        Ok(x) => x,
+    };
+    let final_price = helpers::pricing_logic(count.count.expect("Haha") as i32, price.price_inr);
+    Ok(Json(final_price))
 }

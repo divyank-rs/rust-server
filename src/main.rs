@@ -1,5 +1,6 @@
 mod errors;
 mod handlers;
+mod helpers;
 mod models;
 
 use actix_web::{web, App, HttpServer};
@@ -30,6 +31,9 @@ async fn main() -> std::io::Result<()> {
             }))
             .service(handlers::get_pizzas)
             .service(handlers::put_pizza)
+            .service(handlers::get_order)
+            .service(handlers::put_order)
+            .service(handlers::get_price)
     })
     .bind(("127.0.0.1", 8095))?
     .run()
